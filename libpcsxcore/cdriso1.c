@@ -579,20 +579,15 @@ static int parsecue(const char *isofile) {
 			if (t != 1)
 				sscanf(linebuf, " FILE %255s", tmpb);
 
-//			// absolute path?
-//			ti[numtracks + 1].handle = fopen(tmpb, "rb");
-//			if (ti[numtracks + 1].handle == NULL) {
-//				// relative to .cue?
-				tmp = strrchr(tmpb, '\\');
-				if (tmp == NULL)
-					tmp = strrchr(tmpb, '/');
-				if (tmp != NULL)
-					tmp++;
-				else
-					tmp = tmpb;
-				strncpy(incue_fname, tmp, incue_max_len);
-				ti[numtracks + 1].handle = fopen(filepath, "rb");
-//			}
+			tmp = strrchr(tmpb, '\\');
+			if (tmp == NULL)
+				tmp = strrchr(tmpb, '/');
+			if (tmp != NULL)
+				tmp++;
+			else
+				tmp = tmpb;
+			strncpy(incue_fname, tmp, incue_max_len);
+			ti[numtracks + 1].handle = fopen(filepath, "rb");
 
 			// update global offset if this is not first file in this .cue
 			if (numtracks + 1 > 1) {
@@ -1156,7 +1151,7 @@ static int opensbifile(const char *isoname) {
 			strcpy(sbiname + strlen(sbiname) - 4, disknum);
 		}
 		else
-		strcpy(sbiname + strlen(sbiname) - 4, ".sbi");
+			strcpy(sbiname + strlen(sbiname) - 4, ".sbi");
 	}
 	else {
 		return -1;
@@ -1606,7 +1601,7 @@ static long CALLBACK ISOopen(void) {
 	boolean isMode1ISO = FALSE;
 	char alt_bin_filename[MAXPATHLEN];
 	const char *bin_filename;
-		char image_str[1024] = {0};
+	char image_str[1024] = {0};
 
 	if (cdHandle != NULL) {
 		return 0; // it's already open
@@ -1619,7 +1614,7 @@ static long CALLBACK ISOopen(void) {
 		return -1;
 	}
 
-	SysPrintf(_("Loaded CD Image: %s"), GetIsoFile());
+	sprintf(image_str, "Loaded CD Image: %s", GetIsoFile());
 
 	cddaBigEndian = FALSE;
 	subChanMixed = FALSE;
@@ -1632,24 +1627,24 @@ static long CALLBACK ISOopen(void) {
 	cdimg_read_func = cdread_normal;
 
 	if (parsetoc(GetIsoFile()) == 0) {
-		SysPrintf("[+toc]");
+		strcat(image_str, "[+toc]");
 	}
 	else if (parseccd(GetIsoFile()) == 0) {
-		SysPrintf("[+ccd]");
+		strcat(image_str, "[+ccd]");
 	}
 	else if (parsemds(GetIsoFile()) == 0) {
-		SysPrintf("[+mds]");
+		strcat(image_str, "[+mds]");
 	}
 	else if (parsecue(GetIsoFile()) == 0) {
-		SysPrintf("[+cue]");
+		strcat(image_str, "[+cue]");
 	}
 	if (handlepbp(GetIsoFile()) == 0) {
-		SysPrintf("[pbp]");
+		strcat(image_str, "[+pbp]");
 		CDR_getBuffer = ISOgetBuffer_compr;
 		cdimg_read_func = cdread_compressed;
 	}
 	else if (handlecbin(GetIsoFile()) == 0) {
-		SysPrintf("[cbin]");
+		strcat(image_str, "[+cbin]");
 		CDR_getBuffer = ISOgetBuffer_compr;
 		cdimg_read_func = cdread_compressed;
 	}
@@ -1661,12 +1656,11 @@ static long CALLBACK ISOopen(void) {
 	}
 #endif
 
-
 	if (!subChanMixed && opensubfile(GetIsoFile()) == 0) {
-		SysPrintf("[+sub]");
+		strcat(image_str, "[+sub]");
 	}
 	if (opensbifile(GetIsoFile()) == 0) {
-		SysPrintf("[+sbi]");
+		strcat(image_str, "[+sbi]");
 	}
 
 	fseeko(cdHandle, 0, SEEK_END);
@@ -1704,13 +1698,13 @@ static long CALLBACK ISOopen(void) {
 		fseek(cdHandle, 0, SEEK_SET);
 		fread(&modeTest, 4, 1, cdHandle);
 		if (SWAP32(modeTest) != 0xffffff00) {
-			SysPrintf("[2048]");
+			strcat(image_str, "[2048]");
 			isMode1ISO = TRUE;
 		}
 	}
 	fseek(cdHandle, 0, SEEK_SET);
 
-	SysPrintf(".\n");
+	SysPrintf("%s.\n", image_str);
 
 	PrintTracks();
 
@@ -1726,6 +1720,9 @@ static long CALLBACK ISOopen(void) {
 	cdda_cur_sector = 0;
 	cdda_file_offset = 0;
 
+  if (Config.AsyncCD) {
+    readThreadStart();
+  }
 	return 0;
 }
 
@@ -1770,6 +1767,10 @@ static long CALLBACK ISOclose(void) {
 
 	memset(cdbuffer, 0, sizeof(cdbuffer));
 	CDR_getBuffer = ISOgetBuffer;
+
+	if (Config.AsyncCD) {
+		readThreadStop();
+	}
 
 	return 0;
 }
